@@ -14,6 +14,19 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 
+def preprocess_image(image):
+    # Resize the image to YOLO's expected input size
+    processed_image = image.resize(
+        (640, 640)
+    )  # Resize to 640x640, or the input size expected by YOLO
+
+    # Convert image to RGB if it’s in another mode, as YOLO expects RGB images
+    if processed_image.mode != "RGB":
+        processed_image = processed_image.convert("RGB")
+
+    return processed_image
+
+
 @app.route("/predict", methods=["POST"])
 def predict():
     if "file" not in request.files:
@@ -24,15 +37,19 @@ def predict():
         return jsonify({"error": "No selected file"}), 400
 
     try:
-
+        # Generate a unique filename and save the original image
         unique_filename = str(uuid.uuid4()) + ".jpg"
         image_path = os.path.join(UPLOAD_FOLDER, unique_filename)
 
+        # Open and preprocess the image
         image = Image.open(io.BytesIO(file.read()))
-        image.save(image_path)
+        preprocessed_image = preprocess_image(image)
+        preprocessed_image.save(image_path)
 
+        # Run the YOLO model for prediction on the preprocessed image
         results = model.predict(image_path, save=True)
 
+        # Extract predictions
         predictions = []
         for box in results[0].boxes:
             prediction = {
@@ -67,5 +84,4 @@ def home():
 
 
 if __name__ == "__main__":
-
     app.run(debug=True)
